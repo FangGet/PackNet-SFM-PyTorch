@@ -31,6 +31,8 @@ class Trainer:
 
         self.models = {}
         self.parameters_to_train = []
+        self.depth_parameters_to_train = []
+        self.pose_parameters_to_train = []
 
         self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
 
@@ -43,21 +45,27 @@ class Trainer:
         self.models["encoder"] = networks.PackResNetEncoder()
         self.models["encoder"].to(self.device)
         self.parameters_to_train += list(self.models["encoder"].parameters())
+        self.depth_parameters_to_train += list(self.models["encoder"].parameters())
 
         self.models["depth"] = networks.UnPackDepthDecoder(
             self.models["encoder"].num_ch_enc, self.opt.scales)
         self.models["depth"].to(self.device)
         self.parameters_to_train += list(self.models["depth"].parameters())
+        self.depth_parameters_to_train += list(self.models["depth"].parameters())
 
         self.models["pose"] = networks.PoseCNN(self.num_input_frames if self.opt.pose_model_input == "all" else 2)
 
         self.models["pose"].to(self.device)
         self.parameters_to_train += list(self.models["pose"].parameters())
+        self.pose_parameters_to_train += list(self.models["pose"].parameters())
 
-        self.model_optimizer = optim.Adam(self.parameters_to_train, self.opt.depth_learning_rate)
+        # self.model_optimizer = optim.Adam(self.parameters_to_train, self.opt.depth_learning_rate)
+        self.depth_model_optimizer = optim.Adam(self.depth_parameters_to_train, self.opt.depth_learning_rate)
+        self.pose_model_optimizer = optim.Adam(self.pose_parameters_to_train, self.opt.pose_learning_rate)
         # self.model_optimizer = optim.Adam(self.parameters_to_train, self.opt.learning_rate)
-        self.model_lr_scheduler = optim.lr_scheduler.StepLR(
-            self.model_optimizer, self.opt.scheduler_step_size, 0.5)
+        # self.model_lr_scheduler = optim.lr_scheduler.StepLR(self.model_optimizer, self.opt.scheduler_step_size, 0.5)
+        self.depth_model_lr_scheduler = optim.lr_scheduler.StepLR(self.depth_model_optimizer, self.opt.scheduler_step_size, 0.1)
+        self.pose_model_lr_scheduler = optim.lr_scheduler.StepLR(self.pose_model_optimizer, self.opt.scheduler_step_size, 0.1)
 
         if self.opt.load_weights_folder is not None:
             self.load_model()
@@ -149,7 +157,9 @@ class Trainer:
     def run_epoch(self):
         """Run a single epoch of training and validation
         """
-        self.model_lr_scheduler.step()
+        # self.model_lr_scheduler.step()
+        self.depth_model_lr_scheduler.step()
+        self.pose_model_lr_scheduler.step()
 
         print("Training")
         self.set_train()
@@ -160,9 +170,15 @@ class Trainer:
 
             outputs, losses = self.process_batch(inputs)
 
-            self.model_optimizer.zero_grad()
+            # self.model_optimizer.zero_grad()
+            self.depth_model_optimizer.zero_grad()
+            self.pose_model_optimizer.zero_grad()
+
             losses["loss"].backward()
-            self.model_optimizer.step()
+
+            self.depth_model_optimizer.step()
+            self.pose_model_optimizer.step()
+            # self.model_optimizer.step()
 
             duration = time.time() - before_op_time
 
@@ -539,8 +555,14 @@ class Trainer:
                 to_save['width'] = self.opt.width
             torch.save(to_save, save_path)
 
-        save_path = os.path.join(save_folder, "{}.pth".format("adam"))
-        torch.save(self.model_optimizer.state_dict(), save_path)
+        # save_path = os.path.join(save_folder, "{}.pth".format("adam"))
+        # torch.save(self.model_optimizer.state_dict(), save_path)
+
+        save_path = os.path.join(save_folder, "depth_{}.pth".format("adam"))
+        torch.save(self.depth_model_optimizer.state_dict(), save_path)
+
+        save_path = os.path.join(save_folder, "pose_{}.pth".format("adam"))
+        torch.save(self.pose_model_optimizer.state_dict(), save_path)
 
     def load_model(self):
         """Load model(s) from disk
@@ -560,11 +582,29 @@ class Trainer:
             model_dict.update(pretrained_dict)
             self.models[n].load_state_dict(model_dict)
 
+        # # loading adam state
+        # optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam.pth")
+        # if os.path.isfile(optimizer_load_path):
+        #     print("Loading Depth Adam weights")
+        #     optimizer_dict = torch.load(optimizer_load_path)
+        #     self.model_optimizer.load_state_dict(optimizer_dict)
+        # else:
+        #     print("Cannot find Depth Adam weights so Depth Adam is randomly initialized")
+
         # loading adam state
-        optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam.pth")
+        optimizer_load_path = os.path.join(self.opt.load_weights_folder, "depth_adam.pth")
         if os.path.isfile(optimizer_load_path):
             print("Loading Depth Adam weights")
             optimizer_dict = torch.load(optimizer_load_path)
-            self.model_optimizer.load_state_dict(optimizer_dict)
+            self.depth_model_optimizer.load_state_dict(optimizer_dict)
+        else:
+            print("Cannot find Depth Adam weights so Depth Adam is randomly initialized")
+
+        # loading adam state
+        optimizer_load_path = os.path.join(self.opt.load_weights_folder, "pose_adam.pth")
+        if os.path.isfile(optimizer_load_path):
+            print("Loading Depth Adam weights")
+            optimizer_dict = torch.load(optimizer_load_path)
+            self.pose_model_optimizer.load_state_dict(optimizer_dict)
         else:
             print("Cannot find Depth Adam weights so Depth Adam is randomly initialized")

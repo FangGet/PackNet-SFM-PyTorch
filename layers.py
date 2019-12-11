@@ -107,10 +107,12 @@ class ConvBlock(nn.Module):
         super(ConvBlock, self).__init__()
 
         self.conv = Conv3x3(in_channels, out_channels)
+        self.norm = nn.GroupNorm(16, out_channels, 1e-10)
         self.nonlin = nn.ELU(inplace=True)
 
     def forward(self, x):
         out = self.conv(x)
+        out = self.norm(out)
         out = self.nonlin(out)
         return out
 
@@ -244,21 +246,19 @@ class PackBlock(nn.Module):
         self.useconv3d = use_conv3d
         self.need_last_nolin = need_last_nolin
 
-        self.downscaled_channel = int(in_channels // 1)
+        self.downscaled_channel = int(in_channels // 2)
         self.conv2d_1 = nn.Conv2d(in_channels * 4, self.downscaled_channel, 1, bias=False)
         self.norm2d_1 = nn.GroupNorm(16, self.downscaled_channel, 1e-10)
+        self.nolin2d_1 = nn.ELU(inplace=True)
 
         if use_conv3d:
-
-            self.conv3d_channel = 8
+            self.conv3d_channel = 4
             self.conv3d = nn.Conv3d(1, self.conv3d_channel, 3, bias=True)
+            self.nolin3d = nn.ELU(inplace=True)
 
             self.conv2d = nn.Conv2d(np.int(self.downscaled_channel * self.conv3d_channel), out_channels, 3, bias=False)
         else:
             self.conv2d = nn.Conv2d(self.downscaled_channel, out_channels, 3, bias=False)
-
-
-        self.norm2d = nn.GroupNorm(16, out_channels, 1e-10)
 
         if use_refl:
             self.pad2d = nn.ReflectionPad2d(1)
@@ -266,6 +266,9 @@ class PackBlock(nn.Module):
         else:
             self.pad2d = nn.ZeroPad2d(1)
             self.pad3d = nn.ConstantPad3d(1, 0)
+
+
+        self.norm2d = nn.GroupNorm(16, out_channels, 1e-10)
 
         self.pool3d = SpaceToDepth(2)
         self.nolin = nn.ELU(inplace=True)
@@ -276,14 +279,14 @@ class PackBlock(nn.Module):
         # we do down channel first
         x = self.conv2d_1(x)
         x = self.norm2d_1(x)
-        x = self.nolin(x)
+        x = self.nolin2d_1(x)
 
         N, C, H, W = x.size()
         x = x.view(N, 1, C, H, W)
         if self.useconv3d:
             x = self.pad3d(x)
             x = self.conv3d(x) # now is [N, 8, C, H, W]
-            x = self.nolin(x)
+            x = self.nolin3d(x)
             C *= self.conv3d_channel
 
         x = x.view(N, C, H, W)
@@ -303,11 +306,14 @@ class UnPackBlock(nn.Module):
         self.nolin = nn.ELU(inplace=True)
 
         if use_conv3d:
-            self.conv3d_channels = 8
+            self.conv3d_channels = 4
             self.conv3d = nn.Conv3d(1, self.conv3d_channels, 3, bias=True)
+            self.nolin3d = nn.ELU(inplace=True)
             self.conv2d = nn.Conv2d(in_channels, np.int(4 * out_channels / self.conv3d_channels), 3, bias=True)
+            self.norm2d = nn.GroupNorm(16, np.int(4 * out_channels / self.conv3d_channels), 1e-10)
         else:
             self.conv2d = nn.Conv2d(in_channels, out_channels * 4, 3, bias=True)
+            self.norm2d = nn.GroupNorm(16, out_channels * 4, 1e-10)
 
         if use_refl:
             self.pad2d = nn.ReflectionPad2d(1)
@@ -321,6 +327,7 @@ class UnPackBlock(nn.Module):
     def forward(self, x):
         x = self.pad2d(x)
         x = self.conv2d(x)
+        x = self.norm2d(x)
         x = self.nolin(x)
 
         # B * 4Co/D * H * W
@@ -331,7 +338,7 @@ class UnPackBlock(nn.Module):
             x = x.view(N, 1, C, H, W)
             x = self.pad3d(x)
             x = self.conv3d(x)
-            x = self.nolin(x)
+            x = self.nolin3d(x)
             x = x.view(N, C * self.conv3d_channels, H, W)
 
         x = self.upsample3d(x)

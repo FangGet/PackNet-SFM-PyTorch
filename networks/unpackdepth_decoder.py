@@ -32,48 +32,40 @@ class UnPackDepthDecoder(nn.Module):
             # upconv_0
             num_ch_in = self.num_ch_enc[-1] if i == 4 else self.num_ch_dec[i+1]
             num_ch_out = self.num_ch_dec[i]
-            self.convs[("upconv", i, 0)] = ConvBlock(num_ch_in, num_ch_out)
-            self.convs[("unpack", i)] = UnPackBlock(num_ch_out, num_ch_out)
+            self.convs[("unpack", i)] = UnPackBlock(num_ch_in, num_ch_out)
 
-            tmp_num_ch_in = num_ch_out
             # upconv_1
             if i > 0:
-                num_ch_in = num_ch_out + self.num_ch_enc[i]
+                num_ch_in = num_ch_out + self.num_ch_enc[i-1]
             else:
                 num_ch_in = num_ch_out + 0
 
             if i in self.scales:
                 self.convs[("dispconv", i)] = Conv3x3(self.num_ch_dec[i], self.num_output_channels)
             if i < 3:
-                num_ch_in +=  tmp_num_ch_in
+                num_ch_in += 1
             num_ch_out = self.num_ch_dec[i]
-            self.convs[("upconv", i, 1)] = ConvBlock(num_ch_in, num_ch_out)
-
-        #for s in self.scales:
-        #    self.convs[("dispconv", s)] = Conv3x3(self.num_ch_dec[s], self.num_output_channels)
+            self.convs[("upconv", i, 0)] = ConvBlock(num_ch_in, num_ch_out)
 
         self.decoder = nn.ModuleList(list(self.convs.values()))
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, input_features, idx=0):
+    def forward(self, input_features, idx):
         self.outputs = {}
-        #print("\t[MSG] ", len(input_features))
+
         # decoder
         x = input_features[-1]
         for i in range(4, -1, -1):
-
-            x = self.convs[("upconv", i, 0)](x)
-            tmp_x = x
-            x = self.convs[("unpack", i)](x)
-            if i != 0:
+            x = self.convs[("unpack", i)](x) #12 #14 #17 #20 #23
+            if i > 0:
                 x = [input_features[i], x]
             else:
                 x = [x]
             if i < 3:
-                x += [upsample(tmp_x)]#self.outputs[("disp", idx, i+1)])]
+                x += [upsample(self.outputs[("disp", idx, i+1)])]
             x = torch.cat(x, 1)
-            x = self.convs[("upconv", i, 1)](x)
+            x = self.convs[("upconv", i, 0)](x) #13 #15 #18 #21 #24
             if i in self.scales:
-                self.outputs[("disp", idx, i)] = self.sigmoid(self.convs[("dispconv", i)](x))
+                self.outputs[("disp", idx, i)] = self.sigmoid(self.convs[("dispconv", i)](x)) #16 #19 #21 #24
 
         return self.outputs

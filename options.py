@@ -86,17 +86,17 @@ class MonodepthOptions:
         self.parser.add_argument("--depth_learning_rate",
                                  type=float,
                                  help="depth learning rate",
-                                 default=1e-4
+                                 default=5e-4
                                  )
         self.parser.add_argument("--pose_learning_rate",
                                  type=float,
                                  help="pose learning rate",
-                                 default=1e-4
+                                 default=2e-4
                                  )
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
-                                 default=30)
+                                 default=100)
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
