@@ -1,9 +1,3 @@
-# Copyright Niantic 2019. Patent Pending. All rights reserved.
-#
-# This software is licensed under the terms of the Monodepth2 licence
-# which allows for non-commercial use only, the full terms of which are made
-# available in the LICENSE file.
-
 from __future__ import absolute_import, division, print_function
 
 import numpy as np
@@ -38,7 +32,7 @@ class UnPackDepthDecoder(nn.Module):
             if i > 0:
                 num_ch_in = num_ch_out + self.num_ch_enc[i-1]
             else:
-                num_ch_in = num_ch_out + 0
+                num_ch_in = num_ch_out + 3
 
             if i in self.scales:
                 self.convs[("dispconv", i)] = Conv3x3(self.num_ch_dec[i], self.num_output_channels)
@@ -57,7 +51,7 @@ class UnPackDepthDecoder(nn.Module):
         x = input_features[-1]
         for i in range(4, -1, -1):
             x = self.convs[("unpack", i)](x) #12 #14 #17 #20 #23
-            if i > 0:
+            if i >= 0:
                 x = [input_features[i], x]
             else:
                 x = [x]

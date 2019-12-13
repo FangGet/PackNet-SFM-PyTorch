@@ -442,18 +442,18 @@ class Trainer:
 
         total_loss /= self.num_scales
 
-        # add by fangloveskari
-        # velocity loss
-        v0 = inputs[("velocity", 0, 0)]
-        t0 = inputs[("timestamp", 0, 0)]
-        velocity_loss = []
-        for frame_id in self.opt.frame_ids[1:]:
-            vf = inputs[("velocity", frame_id, 0)]
-            tf = inputs[("timestamp", frame_id, 0)]
-            ttf = outputs[("translation", 0, frame_id)]
-            velocity_loss.append(torch.abs(torch.abs(ttf) - torch.abs((v0 + vf) * 0.5 * (tf - t0))).float())
-
-        total_loss += self.opt.velocity_scale * torch.cat(velocity_loss, dim=1).mean()
+        # # add by fangloveskari
+        # # velocity loss
+        # v0 = inputs[("velocity", 0, 0)]
+        # t0 = inputs[("timestamp", 0, 0)]
+        # velocity_loss = []
+        # for frame_id in self.opt.frame_ids[1:]:
+        #     vf = inputs[("velocity", frame_id, 0)]
+        #     tf = inputs[("timestamp", frame_id, 0)]
+        #     ttf = outputs[("translation", 0, frame_id)]
+        #     velocity_loss.append(torch.abs(torch.abs(ttf) - torch.abs((v0 + vf) * 0.5 * (tf - t0))).float())
+        #
+        # total_loss += self.opt.velocity_scale * torch.cat(velocity_loss, dim=1).mean()
 
         losses["loss"] = total_loss
         return losses

@@ -16,20 +16,16 @@ class BasicBlock(nn.Module):
     def __init__(self, in_channels, out_channels, need_short=False):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(in_channels, in_channels)
-        self.nolin1 = nn.ELU(inplace=True)
+        self.norm2d1 = nn.GroupNorm(16, in_channels, 1e-10)
+        self.nolin = nn.ELU(inplace=True)
 
         self.conv2 = conv3x3(in_channels, out_channels)
-        self.nolin2 = nn.ELU(inplace=True)
-
-
+        self.norm2d2 = nn.GroupNorm(16, out_channels, 1e-10)
 
         self.need_short = need_short
         if self.need_short:
             self.conv3 = conv1x1(in_channels, out_channels)
-            self.nolin3 = nn.ELU(inplace=True)
-
-
-        self.norm2d = nn.GroupNorm(16, out_channels, 1e-10)
+            self.norm2d3 = nn.GroupNorm(16, out_channels, 1e-10)
         self.dropout = nn.Dropout2d(p=0.5)
 
 
@@ -38,21 +34,20 @@ class BasicBlock(nn.Module):
         residual = x
 
         out = self.conv1(x)
-        out = self.nolin1(out)
+        out = self.norm2d1(out)
+        out = self.nolin(out)
+
+        out = self.dropout(out)
 
         out = self.conv2(out)
-        out = self.nolin2(out)
+        out = self.norm2d2(out)
 
         if self.need_short:
-            residual = self.conv3(x)
-            residual = self.nolin3(residual)
-            out = out + residual
-            out = self.norm2d(out)
-            out = self.dropout(out)
-        else:
-            out = self.norm2d(out)
-            out = self.dropout(out)
-            out = out + residual
+            residual = self.conv3(residual)
+            residual = self.norm2d3(residual)
+
+        out += residual
+        out = self.nolin(out)
 
         return out
 
