@@ -26,7 +26,7 @@ class BasicBlock(nn.Module):
         if self.need_short:
             self.conv3 = conv1x1(in_channels, out_channels)
             self.norm2d3 = nn.GroupNorm(16, out_channels, 1e-10)
-        self.dropout = nn.Dropout2d(p=0.5)
+        self.dropout = nn.Dropout2d(p=0.3)
 
 
 
