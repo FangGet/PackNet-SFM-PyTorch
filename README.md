@@ -9,7 +9,7 @@ This codebase almost implements(unofficial) the system described in the paper:
 
 This codebase mainly based on [monodepth2](https://github.com/nianticlabs/monodepth2) and only for academic research.
 
-See the [packnet-sfm(no-code)](https://github.com/ToyotaResearchInstitute/packnet-sfm) and [spillai's homepage](http://people.csail.mit.edu/spillai/) for more detail.
+See the [packnet-sfm(code published)](https://github.com/TRI-ML/packnet-sfm) and [spillai's homepage](http://people.csail.mit.edu/spillai/) for more detail.
 
 ## Preamble
 
